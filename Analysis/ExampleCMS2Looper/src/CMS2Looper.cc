@@ -48,7 +48,9 @@ CMS2Looper::~CMS2Looper()
 // ------------------------------------ //
 void CMS2Looper::BeginJob()
 {
-    AddHist(hists, new TH1F("h_sample", "Example histogram;pdg ID", 25, 0, 25));
+  //AddHist(hists, new TH1F("h_sample", "Example histogram;pdg ID", 25, 0, 25));
+	AddHist(hists, new TH1D("h_m_ee_reco", "Reco dielectron invariant mass;m_{ee} (GeV/c^{2})", 100, 0, 200) );
+	AddHist(hists, new TH1D("h_m_mm_reco", "Reco dimuon invariant mass;m_{#mu#mu} (GeV/c^{2})", 100, 0, 200) );
     return;
 }
 
@@ -61,7 +63,7 @@ void CMS2Looper::Analyze(const long event)
     unsigned int nwzpartons = 0;                                               
                                                                                
     for (size_t idx = 0; idx < tas::genps_id().size(); idx++)                  
-    {                                                                          
+    {
         const unsigned int pid = abs(tas::genps_id().at(idx));                 
         foundz = (pid == 23);                                                 
                                                                                
@@ -107,11 +109,12 @@ void CMS2Looper::ScanChain(TChain& chain, const long num_events)
     //~-~-~-~-~-~-~-~-~-~-~-//
 
     // set the "good run" list 
-    if (!runlist_filename.empty())
+    /*if (!runlist_filename.empty())
     {
         set_goodrun_file(runlist_filename.c_str());
         //set_goodrun_file_json(goodrun_file_name.c_str());
-    }
+	}
+	*/
 
     //~-~-~-~-~-~-~-~-~-~-~-~-~-~-//
     // Loop over events to Analyze//
@@ -140,7 +143,7 @@ void CMS2Looper::ScanChain(TChain& chain, const long num_events)
         TTree* const tree = dynamic_cast<TTree*>(file->Get("Events"));
 
         // initialize the chain
-        cms2.Init(tree);
+        //cms2.Init(tree);
         TTreeCache::SetLearnEntries(10);
         chain.SetCacheSize(128*1024*1024);
 
@@ -156,9 +159,10 @@ void CMS2Looper::ScanChain(TChain& chain, const long num_events)
 
             // Get Event Content
             tree->LoadTree(event);
-            cms2.GetEntry(event);
+            //cms2.GetEntry(event);
             ++num_events_total;
 
+			/*
             //parse events from json
             if (tas::evt_isRealData())
             {
@@ -181,6 +185,7 @@ void CMS2Looper::ScanChain(TChain& chain, const long num_events)
                     continue;
                 }
             }
+			*/
 
             // Progress
             const int i_permille = floor(1000 * num_events_total/ static_cast<float>(num_events_chain));

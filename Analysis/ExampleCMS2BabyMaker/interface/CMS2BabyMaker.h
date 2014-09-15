@@ -42,8 +42,11 @@ class TreeInfo
 
         // Gen hypothesis specific info 
         bool is_gen_z;
+        bool is_gen_tt;
         bool is_gen_ee;
         bool is_gen_mm;
+        bool is_gen_acc_num;
+        bool is_acc_den;
         LorentzVector gen_p4;
         LorentzVector gen_lep1_p4;
         int gen_lep1_id;
@@ -51,6 +54,18 @@ class TreeInfo
         LorentzVector gen_lep2_p4;
         int gen_lep2_id;
         int gen_lep2_charge;
+
+        // Reco hypothesis specific info
+        bool is_reco_ee;
+        bool is_reco_mm;
+        bool is_reco_acc_num;
+        LorentzVector reco_p4;
+        LorentzVector reco_lep1_p4;
+        int reco_lep1_id;
+        int reco_lep1_charge;
+        LorentzVector reco_lep2_p4;
+        int reco_lep2_id;
+        int reco_lep2_charge;
 };
 
 // Simple class to hold your analysis meta-data

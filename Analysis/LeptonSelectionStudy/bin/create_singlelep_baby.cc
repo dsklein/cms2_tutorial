@@ -19,6 +19,8 @@
 #include "CMS2/NtupleMacrosCore/interface/eventSelections.h"
 #include "CMS2/NtupleMacrosCore/interface/trackSelections.h"
 #include "CMS2/NtupleMacrosCore/interface/mcSelections.h"
+#include "CMS2/NtupleMacrosCore/interface/electronSelections.h"
+#include "CMS2/NtupleMacrosCore/interface/MITConversionUtilities.h"
 
 // from packages 
 #include "Packages/LooperTools/interface/LoadFWLite.h"
@@ -473,13 +475,45 @@ double LeptonDz(const int lep_id, const int lep_idx)
     return -999999.0;
 }
 
+double electronIsolationPF2012_cone03(const int el_idx)
+{
+    // electron pT
+    const double pt = tas::els_p4().at(el_idx).pt();
+
+    // get effective area
+    const double AEff = fastJetEffArea03_v2( fabs(tas::els_etaSC().at(el_idx)) );
+
+    // pf iso
+    const double pfiso_ch = tas::els_iso03_pf2012ext_ch().at(el_idx);
+    const double pfiso_em = tas::els_iso03_pf2012ext_em().at(el_idx);
+    const double pfiso_nh = tas::els_iso03_pf2012ext_nh().at(el_idx);
+
+    // rho
+    const double rhoPrime = std::max(tas::evt_kt6pf_foregiso_rho(), 0.0f);
+    const double pfiso_n = std::max(pfiso_em + pfiso_nh - rhoPrime * AEff, 0.0);
+    const double pfiso = (pfiso_ch + pfiso_n) / pt;
+
+    return pfiso;
+}
+
+double muonIsoValuePF2012(const int mu_idx)
+{
+    const double chiso = tas::mus_isoR04_pf_ChargedHadronPt().at(mu_idx);
+    const double nhiso = tas::mus_isoR04_pf_NeutralHadronEt().at(mu_idx);
+    const double emiso = tas::mus_isoR04_pf_PhotonEt().at(mu_idx);
+    const double deltaBeta = tas::mus_isoR04_pf_PUPt().at(mu_idx);
+    const double pt = tas::mus_p4().at(mu_idx).pt();
+    const double absiso = chiso + max(0.0, nhiso + emiso - 0.5 * deltaBeta);
+    return (absiso / pt);
+}
+
 // ------------------------------------ //
 // Stuff to do on each event 
 // ------------------------------------ //
 
 void SingleLeptonNtupleMaker::Analyze(const long event, const std::string& current_filename)
 {
-    if (m_verbose)
+  if (m_verbose)
     {
         std::cout << "\n[SingleLeptonNtupleMaker] Running on run, ls, event: " 
             << tas::evt_run()       << ", "
@@ -489,7 +523,7 @@ void SingleLeptonNtupleMaker::Analyze(const long event, const std::string& curre
 
     // electrons
     // ------------------------------------ //
-
+  /*
     for (size_t el_idx = 0; el_idx < tas::els_p4().size(); ++el_idx)
     {
         // reset the TTree variables
@@ -503,7 +537,7 @@ void SingleLeptonNtupleMaker::Analyze(const long event, const std::string& curre
         m_info.dataset      = tas::evt_dataset().front().Data();
         m_info.filename     = current_filename; 
         m_info.is_real_data = tas::evt_isRealData(); 
-        m_info.rho          = -999999.0; 
+        m_info.rho          = std::max(tas::evt_kt6pf_foregiso_rho(), 0.0f); //// Taken from Ryan's DYselections.cc
         if (!tas::evt_isRealData())
         {
             m_info.scale1fb = tas::evt_scale1fb();
@@ -514,8 +548,8 @@ void SingleLeptonNtupleMaker::Analyze(const long event, const std::string& curre
 
         // lepton info:
         m_info.p4         = tas::els_p4().at(el_idx); 
-        m_info.passes_id  = false;
-        m_info.passes_iso = false;
+        m_info.passes_id  = false; //// Write functions for these two guys!
+        m_info.passes_iso = ( electronIsolationPF2012_cone03(el_idx) < 0.15 ); //// 
         m_info.is_mu      = false;
         m_info.is_el      = true;
         m_info.charge     = tas::els_charge().at(el_idx);
@@ -523,10 +557,10 @@ void SingleLeptonNtupleMaker::Analyze(const long event, const std::string& curre
         m_info.type       = tas::els_type().at(el_idx);
         m_info.d0         = LeptonD0(m_info.pdgid, el_idx);
         m_info.dz         = LeptonDz(m_info.pdgid, el_idx);
-        m_info.pfiso      = -999999.0;
-        m_info.chiso      = -999999.0;
-        m_info.emiso      = -999999.0;
-        m_info.nhiso      = -999999.0;
+        m_info.pfiso      = electronIsolationPF2012_cone03(el_idx); ////
+        m_info.chiso      = tas::els_iso03_pf2012ext_ch().at(el_idx);  //// Stolen from Ryan's DYselections.cc
+        m_info.emiso      = tas::els_iso03_pf2012ext_em().at(el_idx);  ////
+        m_info.nhiso      = tas::els_iso03_pf2012ext_nh().at(el_idx);  ////
 
         // gen info:
         if (!tas::evt_isRealData())
@@ -548,19 +582,20 @@ void SingleLeptonNtupleMaker::Analyze(const long event, const std::string& curre
 
             // determine if from non-colored process (i.e. is prompt)
             // see: https://github.com/cmstas/CORE/blob/scram_compliant/mcSelections.h#L55 
-            m_info.is_prompt = leptonIsFromW(el_idx, m_info.pdgid, /*include SUSY=*/false) >= 1;
+            m_info.is_prompt = leptonIsFromW(el_idx, m_info.pdgid, false) >= 1; //the "false" is "includesusy
         }
 
         // electron info:
-        m_info.el_effarea         = -999999.0;
+        m_info.el_effarea         = fastJetEffArea03_v2( fabs(tas::els_etaSC().at(el_idx)) );  //// From Ryan's DYselections.cc. Can't be simplified.
         m_info.el_sc_eta          = fabs(tas::els_etaSC().at(el_idx));
-        m_info.el_exp_innerlayers = -999999.0;
-        m_info.el_sigma_ieie      = -999999.0;
-        m_info.el_dphi_in         = -999999.0;
-        m_info.el_deta_in         = -999999.0;
-        m_info.el_ooemoop         = -999999.0;
-        m_info.el_h_over_e        = -999999.0;
-        m_info.el_is_conv         = false;
+        m_info.el_exp_innerlayers = tas::els_exp_innerlayers().at(el_idx); //// easy enough
+        m_info.el_sigma_ieie      = tas::els_sigmaIEtaIEta().at(el_idx);   //// easy enough
+        m_info.el_dphi_in         = tas::els_dPhiIn().at(el_idx);          //// easy enough
+        m_info.el_deta_in         = tas::els_dEtaIn().at(el_idx);          //// easy enough
+        m_info.el_ooemoop         = (1. - tas::els_eOverPIn().at(el_idx)) / tas::els_ecalEnergy().at(el_idx); //// This is right
+        m_info.el_h_over_e        = tas::els_hOverE().at(el_idx);          //// easy
+        m_info.el_is_conv         = isMITConversion(el_idx, 0, 1e-6, 2.0, true, false);        //// from DYselections
+		//^^Arguments: index, nWrongHitsMax, probMin, dlMin, matchCTF, requireArbitratedMerged
 
         const double aeta_sc  = fabs(m_info.el_sc_eta);
         m_info.el_is_fiducial = (aeta_sc < 2.5) and not (1.4442 < aeta_sc and aeta_sc < 1.566);
@@ -570,7 +605,7 @@ void SingleLeptonNtupleMaker::Analyze(const long event, const std::string& curre
         m_tree.Fill();
 
     } // end electrons
-
+*/
     // muons
     // ------------------------------------ //
 
@@ -587,7 +622,7 @@ void SingleLeptonNtupleMaker::Analyze(const long event, const std::string& curre
         m_info.dataset      = tas::evt_dataset().front().Data();
         m_info.filename     = current_filename; 
         m_info.is_real_data = tas::evt_isRealData(); 
-        m_info.rho          = -999999.0; 
+        m_info.rho          = std::max(tas::evt_kt6pf_foregiso_rho(), 0.0f);  //// From Ryan's
         if (!tas::evt_isRealData())
         {
             m_info.scale1fb = tas::evt_scale1fb();
@@ -598,8 +633,8 @@ void SingleLeptonNtupleMaker::Analyze(const long event, const std::string& curre
 
         // lepton info:
         m_info.p4         = tas::mus_p4().at(mu_idx); 
-        m_info.passes_id  = false;
-        m_info.passes_iso = false;
+        m_info.passes_id  = false;         //// These should be the outcome of a function. Follow cuts in AN
+        m_info.passes_iso = ( muonIsoValuePF2012(mu_idx) < 0.12 );         //// 
         m_info.is_mu      = true;
         m_info.is_el      = false;
         m_info.charge     = tas::mus_charge().at(mu_idx);
@@ -607,10 +642,10 @@ void SingleLeptonNtupleMaker::Analyze(const long event, const std::string& curre
         m_info.type       = tas::mus_type().at(mu_idx);
         m_info.d0         = LeptonD0(m_info.pdgid, mu_idx);
         m_info.dz         = LeptonDz(m_info.pdgid, mu_idx);
-        m_info.pfiso      = -999999.0;
-        m_info.chiso      = -999999.0;
-        m_info.emiso      = -999999.0;
-        m_info.nhiso      = -999999.0;
+        m_info.pfiso      = muonIsoValuePF2012(mu_idx);      //// <---See DYselections.cc
+        m_info.chiso      = tas::mus_isoR04_pf_ChargedHadronPt().at(mu_idx);   //// Charged hadron iso
+        m_info.emiso      = tas::mus_isoR04_pf_PhotonEt().at(mu_idx);          //// EM isolation
+        m_info.nhiso      = tas::mus_isoR04_pf_NeutralHadronEt().at(mu_idx);   //// Neutral hadron iso
 
         // gen info:
         if (!tas::evt_isRealData())
@@ -636,20 +671,36 @@ void SingleLeptonNtupleMaker::Analyze(const long event, const std::string& curre
         }
 
         // muon info:
-        m_info.mu_is_global_mu       = false;
-        m_info.mu_is_pf_mu           = false;
-        m_info.mu_is_fiducial        = false;
-        m_info.mu_gfit_chi2ndof      = -999999.0;
-        m_info.mu_dbeta              = -999999.0;
-        m_info.mu_nmatched_stations  = -999999;
-        m_info.mu_nvalid_stahits     = -999999;
-        m_info.mu_trk_nvalid_pixhits = -999999;
-        m_info.mu_trk_nlayers        = -999999;
+        m_info.mu_is_global_mu       = ( (tas::mus_type().at(mu_idx) & (1<<1)) != 0 );  //// Taken from DYselections.cc
+        m_info.mu_is_pf_mu           = ((tas::mus_type().at(mu_idx) & (1<<5)) != 0);        //// From DYselections.cc
+        m_info.mu_is_fiducial        = ( fabs(tas::mus_p4().at(mu_idx).eta()) < 2.1 );     //// From AN (or DYselections)
+        m_info.mu_gfit_chi2ndof      = tas::mus_gfit_chi2().at(mu_idx) / tas::mus_gfit_ndof().at(mu_idx); //// This is correct
+        m_info.mu_dbeta              = tas::mus_isoR04_pf_PUPt().at(mu_idx);        //// Stolen from DYselections, because wtf...?
+        m_info.mu_nmatched_stations  = tas::mus_numberOfMatchedStations().at(mu_idx);
+        m_info.mu_nvalid_stahits     = tas::mus_gfit_validSTAHits().at(mu_idx);                    //// Taken from Ryan's DYselections
+
+		// cout << "\nmus_trkidx().size() = " << tas::mus_trkidx().size() << endl;
+		// for( size_t jj=0; jj<tas::mus_trkidx().size(); jj++ ) {
+		//   cout << tas::mus_trkidx().at(jj) << " ";
+		// }
+		// cout << endl;
+		// cout << "mu_idx = " << mu_idx << endl;
+		const int trk_idx            = tas::mus_trkidx().at(mu_idx);
+		// cout << "trk_idx = " << trk_idx << endl;
+		// cout << "trks_valid_pixelhits().size() = " << tas::trks_valid_pixelhits().size() << endl;
+		// cout << "trks_nlayers().size() = " << tas::trks_nlayers().size() << endl;
+		if( trk_idx < 0 ) {
+		  m_info.mu_trk_nvalid_pixhits = -9999;
+		  m_info.mu_trk_nlayers        = -9999;
+		}
+		else {
+		  m_info.mu_trk_nvalid_pixhits = tas::trks_valid_pixelhits().at(trk_idx);    //// From DYselections
+		  m_info.mu_trk_nlayers        = tas::trks_nlayers().at(trk_idx);            //// From DYselections
+		}
 
         // fill the tree
         if (m_verbose) {std::cout << m_info << std::endl;}
         m_tree.Fill();
-
     } // end muons
 
     // done
@@ -860,7 +911,8 @@ try
     const std::vector<std::string> samples
     {
         "dyll",
-        "qcd"
+		"qcd",
+		"tthad"
     };
 
     // check that sample name is value
@@ -869,14 +921,18 @@ try
         throw std::invalid_argument(Form("[create_singlelp_baby] sample %s is not valid.\n", sample_name.c_str()));
     }
 
-    // get sample files
+    /*// get sample files
     std::string input_file = "";
-    if (sample_name == "dyll") {input_file = "/nfs-7/userdata/rwkelley/cms2/DYJetsToLL_M-50_TuneZ2Star_8TeV-madgraph-tarball_Summer12_DR53X-PU_S10_START53_V7A-v1.root";}
-    if (sample_name == "qcd" ) {input_file = "/nfs-7/userdata/rwkelley/cms2/QCD_Pt_20_MuEnrichedPt_15_TuneZ2star_8TeV_pythia6_Summer12_DR53X-PU_S10_START53_V7A-v3.root";}
+    if (sample_name == "dyll") {
+	  input_file = "/nfs-7/userdata/rwkelley/cms2/DYJetsToLL_M-50_TuneZ2Star_8TeV-madgraph-tarball_Summer12_DR53X-PU_S10_START53_V7A-v1.root";
+	}
+    if (sample_name == "qcd" ) {
+	  input_file = "/nfs-7/userdata/rwkelley/cms2/QCD_Pt_20_MuEnrichedPt_15_TuneZ2star_8TeV_pythia6_Summer12_DR53X-PU_S10_START53_V7A-v3.root";
+	}
     if (input_file.empty())
     {
         throw std::invalid_argument(Form("[create_singlelp_baby] sample input_file %s is not valid.\n", input_file.c_str()));
-    }
+		}*/
 
     // set output file
     if (output_file.empty())
@@ -888,7 +944,7 @@ try
     // print the inputs  
     std::cout << "[create_singlep_baby] inputs:\n";
     std::cout << "sample  = " << sample_name      << "\n";
-    std::cout << "input   = " << input_file       << "\n";
+    //std::cout << "input   = " << input_file       << "\n";
     std::cout << "output  = " << output_file      << "\n";
     std::cout << "nevts   = " << number_of_events << "\n";
     std::cout << "verbose = " << verbose          << "\n";
@@ -900,7 +956,18 @@ try
     // Load TChain for the sample
     LoadFWLite();
     TChain chain("Events");
-    chain.Add(input_file.c_str());
+    //chain.Add(input_file.c_str());
+
+	if( sample_name == "dyll" ) {
+	  chain.Add("/hadoop/cms/store/group/snt/papers2012/Summer12_53X_MC/DYJetsToLL_M-50_TuneZ2Star_8TeV-madgraph-tarball_Summer12_DR53X-PU_S10_START53_V7A-v1/V05-03-23/merged_ntuple_[0-5].root");
+	}
+	else if( sample_name == "qcd" ) {
+	  chain.Add("/hadoop/cms/store/group/snt/papers2012/Summer12_53X_MC/QCD_Pt_20_MuEnrichedPt_15_TuneZ2star_8TeV_pythia6_Summer12_DR53X-PU_S10_START53_V7A-v3/V05-03-18_slim/merged_ntuple_1[0-5].root");
+	}
+	else if( sample_name == "tthad" ) {
+	  chain.Add("/hadoop/cms/store/group/snt/papers2012/Summer12_53X_MC/TTJets_HadronicMGDecays_8TeV-madgraph_Summer12_DR53X-PU_S10_START53_V7A_ext-v1/V05-03-24/merged_ntuple_1[0-9].root");
+	}
+
 
     // create baby maker object
     SingleLeptonNtupleMaker baby_maker

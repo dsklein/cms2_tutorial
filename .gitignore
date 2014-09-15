@@ -1,0 +1,16 @@
+#ignore backup files
+*.*~
+
+#ignore compiled C++
+*.d
+*.so
+
+#ignore root files (e.g. babies, plots)
+*.root
+
+#ignore output plots
+*.eps
+*.pdf
+*.png
+*.svg
+
