@@ -1,0 +1,9 @@
+This is Dan's code from the CMS2 portion of Ryan's Drell-Yan analysis tutorial.
+
+Check out an instance of CMSSW_6_1_2.
+The folders 'Analysis' and 'Packages' contained in this repo should go into CMSSW_6_1_2/src. You might even want to check out this repo and then rename it 'src' for simplicity.
+You'll also need to check out Ryan's Analysis Tools into src. See: https://github.com/kelleyrw/AnalysisTools
+Also, make a directory 'CMS2'. In that directory, check out cmstas/Dictionaries. Also check out cmstas/CORE, the branch 'scram_compliant', to the name 'NtupleMacrosCore'.
+(If this seems confusing, try reading: http://www.t2.ucsd.edu/twiki2/bin/view/UCSDTier2/AnalysisTutorial#Example_CMS2_Looper)
+
+More specific instructions for running the code are in Analysis/ExampleCMS2BabyMaker/README and Analysis/LeptonSelectionStudy/README.

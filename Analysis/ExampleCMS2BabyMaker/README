@@ -1,0 +1,19 @@
+Analysis Tutorial - CMS2 baby-maker and Z-peak analysis
+Basic instructions for use
+
+
+To compile the code:
+$ scram b -j20
+
+To create the babies:
+$ ./scripts/create_babies_all.sh
+
+To analyze the babies, and make basic plots of m_ll, acceptance, etc.:
+$ cd classfiles/
+$ root doAll_analyze.C
+
+(other of the doAll/ScanChain pairs do slightly different things, e.g. make event lists)
+
+To make stacked histograms of the m_ll distributions:
+$ cd macros/
+$root makestacks.C

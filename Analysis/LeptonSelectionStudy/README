@@ -1,0 +1,18 @@
+Analysis Tutorial - Lepton selections and cut-flow exercise
+Simple instructions for use
+
+To compile the code:
+$ scram b -j20
+
+To run the baby-maker:
+$ create_singlelep_baby --sample dyll
+$ create_singlelep_baby --sample qcd
+  ---OR---
+$ ./scripts/create_babies_all.py
+
+
+To perform the cut-flow analysis, and make plots from the babies:
+$ root
+root [0] .x $CMSSW_BASE/src/Packages/HistTools/macros/load_histtools.C
+root [1] .L macros/CreatePlots.C+
+root [2] CreatePlots("some_name", "eps")
