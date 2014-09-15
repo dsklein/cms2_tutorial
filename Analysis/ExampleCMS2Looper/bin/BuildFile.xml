@@ -1,0 +1,4 @@
+<use name="Analysis/ExampleCMS2Looper"/>
+<environment>
+  <bin name="run_sample" file="run_sample.cc"/>
+</environment>
